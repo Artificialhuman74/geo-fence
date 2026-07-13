@@ -1,0 +1,6 @@
+firebase-admin>=6.5,<7
+Flask>=3.0,<4
+numpy>=1.26,<3
+PyYAML>=6.0,<7
+playsound==1.2.2
+plyer>=2.1,<3

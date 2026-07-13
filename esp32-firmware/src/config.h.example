@@ -1,0 +1,37 @@
+#pragma once
+
+// ---- WiFi (phone's mobile hotspot) ----
+#define WIFI_SSID     "YOUR_PHONE_HOTSPOT_SSID"
+#define WIFI_PASSWORD "YOUR_PHONE_HOTSPOT_PASSWORD"
+#define WIFI_RECONNECT_INTERVAL_MS 5000
+#define WIFI_CONNECT_TIMEOUT_MS    15000
+
+// ---- Firebase Realtime Database ----
+// Host only, no scheme, e.g. "your-project-id-default-rtdb.firebaseio.com"
+#define FIREBASE_HOST "YOUR-PROJECT-ID-default-rtdb.firebaseio.com"
+// Realtime Database "Secret" (Project Settings -> Service Accounts -> Database
+// Secrets, legacy). Simplest auth for a single trusted device; rotate it if
+// it ever leaks, since it grants full read/write on the database.
+#define FIREBASE_AUTH "YOUR_FIREBASE_DATABASE_SECRET"
+
+#define DEVICE_ID "freebot-01"
+
+// ---- GPS UART (NEO-6M/NEO-M8N on Serial2) ----
+// NEO-6M breakout boards (incl. the micro-USB ones): the USB port is only
+// for PC/u-center or power — the ESP32 connects via the header pins.
+#define GPS_RX_PIN 16   // ESP32 RX2 <- GPS TX
+#define GPS_TX_PIN 17   // ESP32 TX2 -> GPS RX
+#define GPS_BAUD   9600 // NEO-6M factory default (8N1)
+// If no NMEA sentences arrive within this window, report "no_gps_data"
+// instead of "no_fix" so wiring problems are obvious.
+#define GPS_DATA_TIMEOUT_MS 10000
+
+// ---- Buzzer ----
+#define BUZZER_PIN         4
+#define BUZZER_BEEP_MS     200
+#define BUZZER_GAP_MS      200
+#define BUZZER_BEEP_COUNT  5   // beeps per "ALARM" command received
+
+// ---- Reporting / polling ----
+#define REPORT_INTERVAL_MS  1000  // GPS fix push cadence
+#define COMMAND_POLL_INTERVAL_MS 2000  // how often to check for an "ALARM" command

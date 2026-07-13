@@ -1,0 +1,20 @@
+# secrets — never commit
+laptop-dashboard/firebase-service-account.json
+esp32-firmware/src/config.h
+
+# build / runtime artifacts
+esp32-firmware/.pio/
+__pycache__/
+laptop-dashboard/geofence_log.csv
+*.pyc
+.venv/
+venv/
+.DS_Store
+
+# local alarm audio (third-party freesound clip; path set in config.yaml)
+*.mp3
+*.wav
+
+# deploy tool state
+.railway/
+.netlify/

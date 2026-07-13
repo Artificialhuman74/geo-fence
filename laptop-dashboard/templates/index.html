@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GEOFENCE // live tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070d0b;
+    --panel:rgba(9,18,15,.88);
+    --line:rgba(70,240,160,.22);
+    --ink:#c9e8d6;
+    --dim:#5d7a6b;
+    --green:#46f0a0;
+    --amber:#ffb347;
+    --red:#ff4d5e;
+    --font-d:"Chakra Petch",sans-serif;
+    --font-m:"IBM Plex Mono",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font-m);overflow:hidden}
+  #map{position:absolute;inset:0;background:var(--bg)}
+  .leaflet-container{font-family:var(--font-m)}
+
+  /* faint scanline atmosphere over everything */
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:1200;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 1px,transparent 1px 3px);
+    mix-blend-mode:multiply}
+
+  .panel{position:absolute;z-index:1000;background:var(--panel);
+    border:1px solid var(--line);backdrop-filter:blur(6px);padding:14px 16px}
+  .panel::before,.panel::after{content:"";position:absolute;width:10px;height:10px;
+    border:1px solid var(--green);opacity:.7}
+  .panel::before{top:-1px;left:-1px;border-right:none;border-bottom:none}
+  .panel::after{bottom:-1px;right:-1px;border-left:none;border-top:none}
+
+  /* ---------- header ---------- */
+  #hdr{top:14px;left:14px;display:flex;align-items:center;gap:12px;padding:10px 16px}
+  #hdr h1{font-family:var(--font-d);font-size:17px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--green)}
+  #hdr h1 span{color:var(--dim);font-weight:500}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+  .led.ok{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 2s infinite}
+  .led.warn{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:blink 1s infinite}
+  .led.bad{background:var(--red);box-shadow:0 0 8px var(--red);animation:blink .5s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  #conn{font-size:11px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+
+  /* ---------- readouts ---------- */
+  #stats{top:76px;left:14px;width:252px;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+  .stat label{display:block;font-size:9px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:2px}
+  .stat b{font-size:19px;font-weight:600;font-family:var(--font-d);color:var(--ink)}
+  .stat small{font-size:10px;color:var(--dim)}
+  #d-dist.out{color:var(--red)}
+  #inout{grid-column:1/-1;text-align:center;font-family:var(--font-d);font-weight:700;
+    letter-spacing:.22em;font-size:13px;padding:6px 0;border:1px dashed var(--line)}
+  #inout.in{color:var(--green)}
+  #inout.out{color:var(--red);border-color:var(--red);animation:blink .8s infinite}
+
+  #stats .btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
+
+  /* ---------- geofence editor ---------- */
+  #fence{top:376px;left:14px;width:252px}
+  #fence h2, #log h2{font-family:var(--font-d);font-size:11px;font-weight:600;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--green);margin-bottom:10px}
+  #fence .hint{font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:10px}
+  #fence .row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  #fence input[type=range]{flex:1;accent-color:var(--green)}
+  #fence input[type=number]{width:74px;background:transparent;border:1px solid var(--line);
+    color:var(--ink);font-family:var(--font-m);font-size:12px;padding:4px 6px}
+  #fence .coords{font-size:10px;color:var(--dim);margin-bottom:10px;min-height:12px}
+  .btn{display:inline-block;width:100%;text-align:center;cursor:pointer;user-select:none;
+    font-family:var(--font-d);font-weight:600;font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;padding:9px 0;border:1px solid var(--line);
+    background:transparent;color:var(--ink);transition:all .15s}
+  .btn:hover{border-color:var(--green);color:var(--green);box-shadow:0 0 12px rgba(70,240,160,.25)}
+  .btn.primary{border-color:var(--green);color:var(--green)}
+  .btn.danger{border-color:var(--red);color:var(--red);margin-top:8px}
+  .btn.danger:hover{box-shadow:0 0 12px rgba(255,77,94,.35)}
+  .btn.small{width:auto;padding:6px 10px;font-size:10px}
+  .btn:disabled{opacity:.35;pointer-events:none}
+  #fence .btnrow{display:flex;gap:8px;margin-bottom:8px}
+
+  /* ---------- event log ---------- */
+  #log{bottom:14px;right:14px;width:300px;max-height:38vh;display:flex;flex-direction:column}
+  #log ul{list-style:none;overflow-y:auto;font-size:10.5px;line-height:1.7}
+  #log li{display:flex;gap:8px;border-bottom:1px solid rgba(70,240,160,.08);padding:2px 0}
+  #log .k{width:74px;flex:none;font-weight:600;letter-spacing:.06em}
+  #log .k.BREACH,#log .k.STILL_OUT{color:var(--red)}
+  #log .k.BACK_IN{color:var(--green)}
+  #log .k.FENCE_SET{color:var(--amber)}
+  #log .k.RING{color:var(--amber)}
+  #log time{color:var(--dim);width:58px;flex:none}
+  #log .empty{color:var(--dim);font-size:10.5px}
+
+  /* ---------- sound toggle ---------- */
+  #sound{top:14px;right:14px;padding:8px 12px}
+
+  /* ---------- breach banner ---------- */
+  #banner{position:absolute;z-index:1100;top:0;left:0;right:0;display:none;
+    text-align:center;font-family:var(--font-d);font-weight:700;font-size:14px;
+    letter-spacing:.35em;text-transform:uppercase;color:#fff;padding:8px 0;
+    background:linear-gradient(90deg,transparent,rgba(255,77,94,.85) 20% 80%,transparent);
+    animation:blink .7s infinite}
+  body.breach #banner{display:block}
+
+  /* ---------- tracker marker ---------- */
+  .tracker{position:relative}
+  .tracker .dot{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;
+    border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+  .tracker .ring{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;
+    border-radius:50%;border:2px solid var(--green);animation:pulse 1.8s ease-out infinite}
+  body.breach .tracker .dot{background:var(--red);box-shadow:0 0 10px var(--red)}
+  body.breach .tracker .ring{border-color:var(--red)}
+  @keyframes pulse{from{transform:scale(1);opacity:.9}to{transform:scale(4.2);opacity:0}}
+
+  .leaflet-control-attribution{background:rgba(7,13,11,.7)!important;color:var(--dim)!important;font-size:9px!important}
+  .leaflet-control-attribution a{color:var(--dim)!important}
+</style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="banner">◤ Geofence breach ◥</div>
+
+  <div id="hdr" class="panel">
+    <div class="led" id="led"></div>
+    <h1>Geofence <span id="devid">// —</span></h1>
+    <div id="conn">waiting…</div>
+  </div>
+
+  <div id="stats" class="panel">
+    <div class="stat"><label>Distance</label><b id="d-dist">—</b> <small>m</small></div>
+    <div class="stat"><label>Speed</label><b id="d-spd">—</b> <small>km/h</small></div>
+    <div class="stat"><label>Satellites</label><b id="d-sats">—</b></div>
+    <div class="stat"><label>Last fix</label><b id="d-age">—</b></div>
+    <div class="stat"><label>Accuracy 95%</label><b id="d-acc">—</b> <small>m</small></div>
+    <div class="stat"><label>Fix rate</label><b id="d-rate">—</b> <small>/s</small></div>
+    <div id="inout">NO DATA</div>
+    <div class="btnrow" style="grid-column:1/-1;display:flex;gap:8px">
+      <a class="btn small" id="gmaps" target="_blank" rel="noopener" style="flex:1;text-decoration:none">◎ google maps</a>
+      <a class="btn small" id="groute" target="_blank" rel="noopener" style="flex:1;text-decoration:none">➔ route to it</a>
+    </div>
+  </div>
+
+  <div id="fence" class="panel">
+    <h2>Geofence</h2>
+    <div class="hint">Click the map to place the fence center, set the radius, then save.</div>
+    <div class="coords" id="f-coords">center: —</div>
+    <div class="row">
+      <input type="range" id="f-slider" min="10" max="2000" step="10" value="50">
+      <input type="number" id="f-radius" min="5" max="50000" value="50"> m
+    </div>
+    <div class="btnrow">
+      <button class="btn small" id="f-here">center on tracker</button>
+      <button class="btn small" id="f-cancel" title="Discard unsaved edits and silence the alarm if it's sounding">reset / silence</button>
+    </div>
+    <button class="btn primary" id="f-save" disabled>Save geofence</button>
+    <button class="btn danger" id="ring">⟟ Ring tracker buzzer</button>
+  </div>
+
+  <div id="sound" class="panel"><button class="btn small" id="soundbtn">enable breach siren</button></div>
+
+  <div id="log" class="panel">
+    <h2>Event log</h2>
+    <ul id="events"><li class="empty">no events yet</li></ul>
+  </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+
+const map = L.map('map', {zoomControl:false, attributionControl:true}).setView([12.9345, 77.534], 16);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 20, attribution: '&copy; OpenStreetMap &copy; CARTO'
+}).addTo(map);
+L.control.zoom({position:'bottomleft'}).addTo(map);
+
+// --- layers ---------------------------------------------------------------
+const fenceCircle = L.circle([0,0], {radius:50, color:'#46f0a0', weight:1.5,
+  fillColor:'#46f0a0', fillOpacity:.06}).addTo(map);
+const pendingCircle = L.circle([0,0], {radius:50, color:'#ffb347', weight:1.5,
+  dashArray:'6 6', fillColor:'#ffb347', fillOpacity:.04});
+// raw fixes: faint dashed — shows what the Kalman filter is correcting
+const rawTrail = L.polyline([], {color:'#ff8a7a', weight:1, opacity:.3,
+  dashArray:'2 5'}).addTo(map);
+// filtered path: what the tracker actually did
+const trail = L.polyline([], {color:'#46f0a0', weight:2.5, opacity:.65}).addTo(map);
+const marker = L.marker([0,0], {icon: L.divIcon({className:'tracker',
+  html:'<div class="ring"></div><div class="dot"></div>', iconSize:[12,12]})});
+// 95% error ellipse of the recent fix scatter, centered on the smoothed
+// position — the region the tracker is actually in.
+const errEllipse = L.polygon([], {color:'#7fd7ff', weight:1, dashArray:'3 5',
+  fillColor:'#7fd7ff', fillOpacity:.06});
+
+function ellipseLatLngs(e){
+  const kLat = 111320, kLon = 111320*Math.cos(e.lat*Math.PI/180);
+  const th = e.angle_deg*Math.PI/180;
+  const pts = [];
+  for (let i=0;i<=48;i++){
+    const t = i/48*2*Math.PI;
+    const x = e.semi_major_m*Math.cos(t), y = e.semi_minor_m*Math.sin(t);
+    const east  = x*Math.cos(th) - y*Math.sin(th);
+    const north = x*Math.sin(th) + y*Math.cos(th);
+    pts.push([e.lat + north/kLat, e.lon + east/kLon]);
+  }
+  return pts;
+}
+
+// --- geofence editor state --------------------------------------------------
+let committed = null;          // fence as known by the server
+let pending = null;            // {lat,lon,radius_m} being edited, or null
+let firstFit = true;
+let lastFix = null;
+let lastPos = null;            // filtered [lat,lon] — best current estimate
+
+function pendingDiffers(){
+  return pending && (!committed ||
+    pending.lat !== committed.lat || pending.lon !== committed.lon ||
+    pending.radius_m !== committed.radius_m);
+}
+function renderPending(){
+  if (pendingDiffers()){
+    pendingCircle.setLatLng([pending.lat, pending.lon]).setRadius(pending.radius_m);
+    if (!map.hasLayer(pendingCircle)) pendingCircle.addTo(map);
+    $('f-coords').textContent = `center: ${pending.lat.toFixed(5)}, ${pending.lon.toFixed(5)} (unsaved)`;
+    $('f-save').disabled = false;
+  } else {
+    map.removeLayer(pendingCircle);
+    $('f-coords').textContent = committed
+      ? `center: ${committed.lat.toFixed(5)}, ${committed.lon.toFixed(5)}` : 'center: —';
+    $('f-save').disabled = true;
+  }
+}
+function setRadius(r){
+  r = Math.max(5, Math.min(50000, Math.round(r)));
+  $('f-radius').value = r; $('f-slider').value = Math.min(2000, r);
+  if (!pending) pending = committed ? {...committed} : null;
+  if (pending){ pending.radius_m = r; renderPending(); }
+}
+map.on('click', e => {
+  const r = pending ? pending.radius_m : (committed ? committed.radius_m : +$('f-radius').value);
+  pending = {lat: e.latlng.lat, lon: e.latlng.lng, radius_m: r};
+  renderPending();
+});
+$('f-slider').addEventListener('input', e => setRadius(+e.target.value));
+$('f-radius').addEventListener('change', e => setRadius(+e.target.value));
+$('f-here').onclick = () => { if (lastPos){
+  pending = {lat:lastPos[0], lon:lastPos[1],
+             radius_m: pending ? pending.radius_m : (committed ? committed.radius_m : 50)};
+  renderPending(); } };
+$('f-cancel').onclick = () => {
+  pending = null;
+  const r = committed ? committed.radius_m : 50;
+  $('f-radius').value = r; $('f-slider').value = Math.min(2000, r);
+  renderPending();
+  fetch('/api/silence', {method:'POST'});  // also stops a currently-sounding siren
+};
+$('f-save').onclick = async () => {
+  const r = await fetch('/api/geofence', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(pending)});
+  if (r.ok){ pending = null; poll(); }
+  else alert('save failed: ' + (await r.text()));
+};
+$('ring').onclick = () => fetch('/api/ring', {method:'POST'});
+
+// --- breach siren (WebAudio needs a user gesture to start) ------------------
+let audioCtx = null, sirenOn = false;
+$('soundbtn').onclick = () => {
+  if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  sirenOn = !sirenOn;
+  $('soundbtn').textContent = sirenOn ? 'siren armed ✓' : 'enable breach siren';
+};
+function beep(){
+  if (!sirenOn || !audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type='square'; o.frequency.value=880; g.gain.value=.08;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.frequency.linearRampToValueAtTime(440, audioCtx.currentTime+.35);
+  o.stop(audioCtx.currentTime+.4);
+}
+
+// --- polling -----------------------------------------------------------------
+let lastState = null;
+async function poll(){
+  let s;
+  try { s = await (await fetch('/api/state')).json(); }
+  catch(e){ $('conn').textContent = 'server unreachable'; $('led').className='led bad'; return; }
+  lastState = s;
+  lastState._skew = s.now - Date.now()/1000;
+
+  if (s.device_id){
+    $('devid').textContent = '// ' + s.device_id;
+    document.title = 'GEOFENCE // ' + s.device_id;
+  }
+
+  committed = s.geofence;
+  if (committed){
+    fenceCircle.setLatLng([committed.lat, committed.lon]).setRadius(committed.radius_m);
+    if (firstFit && !s.fix){ map.setView([committed.lat, committed.lon], 16); }
+  }
+  renderPending();
+
+  if (s.fix){
+    const prevFix = lastFix;
+    lastFix = s.fix;
+    // marker sits on the Kalman-filtered position, not the raw fix
+    const pos = s.filtered || [s.fix.lat, s.fix.lon];
+    lastPos = pos;
+    marker.setLatLng(pos);
+    if (!map.hasLayer(marker)) marker.addTo(map);
+    trail.setLatLngs(s.trail);
+    rawTrail.setLatLngs(s.raw_trail || []);
+    if (firstFit){ map.setView(pos, 16); firstFit=false; }
+    $('d-spd').textContent = s.fix.speed_kmh.toFixed(1);
+    $('d-sats').textContent = s.fix.sats;
+
+    // fix rate estimated from the timestamps of consecutive distinct fixes
+    if (prevFix && s.fix.received_at > prevFix.received_at){
+      const dt = s.fix.received_at - prevFix.received_at;
+      $('d-rate').textContent = (1/dt).toFixed(1);
+    }
+
+    $('gmaps').href  = `https://www.google.com/maps/search/?api=1&query=${pos[0]},${pos[1]}`;
+    $('groute').href = `https://www.google.com/maps/dir/?api=1&destination=${pos[0]},${pos[1]}`;
+    $('gmaps').removeAttribute('aria-disabled');
+    $('groute').removeAttribute('aria-disabled');
+  } else {
+    $('gmaps').setAttribute('aria-disabled','true');
+    $('groute').setAttribute('aria-disabled','true');
+  }
+
+  if (s.ellipse){
+    errEllipse.setLatLngs(ellipseLatLngs(s.ellipse));
+    if (!map.hasLayer(errEllipse)) errEllipse.addTo(map);
+    $('d-acc').textContent = '±' + s.ellipse.semi_major_m.toFixed(1);
+  } else {
+    map.removeLayer(errEllipse);
+    $('d-acc').textContent = '—';
+  }
+  $('d-dist').textContent = s.distance_m == null ? '—' : Math.round(s.distance_m);
+  $('d-dist').className = s.is_outside ? 'out' : '';
+
+  const io = $('inout');
+  if (s.is_outside === null || s.is_outside === undefined){ io.textContent='NO DATA'; io.className=''; }
+  else if (s.is_outside){ io.textContent='◤ OUTSIDE FENCE ◥'; io.className='out'; }
+  else { io.textContent='INSIDE FENCE'; io.className='in'; }
+  document.body.classList.toggle('breach', !!s.is_outside);
+  if (s.is_outside) beep();
+
+  // connection / device status
+  const age = s.fix ? (s.now - s.fix.received_at) : null;
+  const dev = s.device_status ? s.device_status.status : null;
+  let led='warn', txt='no data yet';
+  if (age !== null && age < 15 && dev !== 'no_fix' && dev !== 'no_gps_data'){ led='ok'; txt='live'; }
+  else if (dev === 'no_gps_data'){ led='bad'; txt='gps wiring?'; }
+  else if (dev === 'no_fix'){ led='warn'; txt='no sat fix'; }
+  else if (age !== null && age >= 15){ led='bad'; txt='signal lost'; }
+  $('led').className='led '+led; $('conn').textContent = txt;
+
+  // events (DOM built with textContent — event text is treated as plain text)
+  const ul = $('events');
+  ul.replaceChildren();
+  if (!s.events.length){
+    const li = document.createElement('li');
+    li.className = 'empty'; li.textContent = 'no events yet';
+    ul.appendChild(li);
+  }
+  for (const ev of s.events){
+    const li = document.createElement('li');
+    const t = document.createElement('time');
+    t.textContent = ev.t.slice(11,19);
+    const k = document.createElement('span');
+    k.className = 'k ' + ev.kind; k.textContent = ev.kind;
+    const d = document.createElement('span');
+    d.textContent = ev.detail;
+    li.append(t, k, d);
+    ul.appendChild(li);
+  }
+}
+setInterval(poll, 1000); poll();
+
+// tick "last fix" age every second without waiting for the next poll
+setInterval(() => {
+  if (!lastState || !lastState.fix){ $('d-age').textContent='—'; return; }
+  const age = Math.max(0, Math.round(Date.now()/1000 + (lastState._skew||0)
+              - lastState.fix.received_at));
+  $('d-age').textContent = age < 60 ? age+'s' : Math.floor(age/60)+'m'+(age%60)+'s';
+}, 1000);
+</script>
+</body>
+</html>

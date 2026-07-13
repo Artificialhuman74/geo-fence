@@ -1,0 +1,13 @@
+# Netlify hosts the dashboard UI as a static page and proxies /api/* to the
+# Railway backend, so the frontend JS needs no CORS and no configuration.
+
+[build]
+  command = "mkdir -p dist && cp laptop-dashboard/templates/index.html dist/index.html"
+  publish = "dist"
+
+[[redirects]]
+  from = "/api/*"
+  # Railway backend URL — update if the Railway domain changes.
+  to = "https://RAILWAY-URL-PLACEHOLDER/api/:splat"
+  status = 200
+  force = true

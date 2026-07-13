@@ -1,0 +1,4 @@
+# Root requirements for hosted deployment (Railway); local dev uses
+# laptop-dashboard/requirements.txt directly.
+-r laptop-dashboard/requirements.txt
+gunicorn>=21,<24

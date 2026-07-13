@@ -1,0 +1,25 @@
+# GPS Geofence Alarm — laptop dashboard config
+
+home:
+  lat: 12.934500
+  lon: 77.534000
+
+radius_m: 50
+
+geofence:
+  # seconds to wait between repeat alarms while continuously outside the radius
+  alarm_cooldown_seconds: 30
+
+firebase:
+  # path to the service account JSON key you downloaded from the Firebase console
+  service_account_path: "./firebase-service-account.json"
+  # Realtime Database URL, e.g. https://your-project-id-default-rtdb.firebaseio.com
+  database_url: "https://gps-geofence-68052-default-rtdb.asia-southeast1.firebasedatabase.app"
+  device_id: "freebot-01"
+
+log_file: "geofence_log.csv"
+
+alarm:
+  # path to a .wav/.mp3 to loop while outside the geofence; falls back to a
+  # terminal bell if missing
+  sound_file: "freesound_community-loud-emergency-alarm-54635.mp3"
