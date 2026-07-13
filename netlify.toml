@@ -8,6 +8,6 @@
 [[redirects]]
   from = "/api/*"
   # Railway backend URL — update if the Railway domain changes.
-  to = "https://RAILWAY-URL-PLACEHOLDER/api/:splat"
+  to = "https://geo-fence-production.up.railway.app/api/:splat"
   status = 200
   force = true
