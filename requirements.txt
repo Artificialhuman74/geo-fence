@@ -1,4 +1,11 @@
-# Root requirements for hosted deployment (Railway); local dev uses
-# laptop-dashboard/requirements.txt directly.
--r laptop-dashboard/requirements.txt
+# Root requirements for hosted deployment (Railway). Kept as a flat list
+# (not `-r laptop-dashboard/requirements.txt`) because Railway's Python
+# builder installs dependencies in a layer before the rest of the repo is
+# copied in, so a reference to a nested file 404s at build time.
+firebase-admin>=6.5,<7
+Flask>=3.0,<4
+numpy>=1.26,<3
+PyYAML>=6.0,<7
+playsound==1.2.2
+plyer>=2.1,<3
 gunicorn>=21,<24
